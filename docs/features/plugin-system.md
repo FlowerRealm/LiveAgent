@@ -1,6 +1,6 @@
 # LiveAgent 插件系统设计（plugins v1 · 迁移自 Revlm 包格式 v1）
 
-> 状态：**设计草案**（待 grill 固化）
+> 状态：**v1 规格**（2026-08-03 经 grill 固化，范围锁定 provider 注入闭环）
 > 日期：2026-08-03
 > 上游参照：Revlm plugins v3（包格式 v1），见
 > `/Users/realm/revlm/docs/plugin-package-format.md`、`/Users/realm/revlm/CONTEXT.md` 与
@@ -10,6 +10,16 @@
 > TypeScript/React + Rust/Tauri + Go Gateway；直接照搬会把一套为 ELF 符号替换设计的
 > 机制硬塞进一个没有原生插件面的项目。迁移的对象是 Revlm 经过多轮 grill 沉淀出的
 > **架构决策**，处理对象是它的**语言绑定机制**：保留的保留、翻译的翻译、砍掉的砍掉。
+
+---
+
+## 0.5 本文是 v1 规格（grill 已固化）
+
+2026-08-03 经 grill 逐项收敛，本文从"设计草案"固化为可实施的 **v1 规格**。已定决策（下文各节详述）：
+- **范围**：provider 注入闭环 + 插件管理页 CRUD。tool/ui 能力面、`api.proxy`、模型选择器合并 UI、usage/nativeWebSearch、`buildStream` 均**不在 v1**。
+- **插件 = 内部协议**：插件 provider 是一个协议（`plugin:<id>`），在供应商配置里与 OpenAI/Claude/Gemini/Grok **并列**；一个协议可被多个 provider 实例复用。
+- **无原生二进制面**：Tauri 不提供运行期动态加载编译插件（无稳定 ABI），插件是**纯前端 ESM + 核心内建库**，主动生命周期能力经 `api` 由核心提供。
+- **复用现有协议**：插件 `createModel` 返回一个 `api ∈ {anthropic-messages, openai-completions, openai-responses, google-generative-ai}` 的 model，核心走现有 `streamSimpleByApi`。**不写 `buildStream`**。
 
 ---
 
@@ -55,8 +65,8 @@
 | 冲突不检测，后果由插件承担 | 复用 builtinRegistry 的"先到先得 + 告警不 throw" | **保留** |
 | LD_PRELOAD 同名符号替换 + `RTLD_NEXT` 链 | 注册函数 `register(api)`，核心注册表按序收集 | **翻译** |
 | `/v1` 核心唯一协议入口 → API key → ChannelGroup → hook 链 | providerId → provider adapter 注册表 → stream adapter | **翻译** |
-| `revlm_register_http_routes(Server&)` 启动期一次性注册 | `api.registerProvider` / `api.registerToolBundle` / `api.registerUi` | **翻译** |
-| `ChannelGroup.type` 属于组，协议分发以组为单位 | `ProviderId` 属于 provider 配置，分发以 providerId 为单位 | **翻译** |
+| `revlm_register_http_routes(Server&)` 启动期一次性注册 | `api.registerProvider`（v1）；`registerToolBundle`/`registerUi`（后补） | **翻译** |
+| `ChannelGroup.type` 属于组，协议分发以组为单位 | `ProviderId` 属于 provider 配置，分发以 providerId 为单位；插件 provider 的 `ProviderId = plugin:<id>` | **翻译** |
 | `revlm_plugin_migrate()` / `revlm_plugin_cleanup()`（插件自管数据库） | 无插件数据库；插件经 Tauri command 用核心 store | **砍掉** |
 | `core_abi` / ABI 校验 | 无 ABI 概念 | **砍掉** |
 | 清单 `targets`/`requires`/`load_order`/`migrations` | 不进清单 | **砍掉** |
@@ -82,8 +92,8 @@ frontend/assets/...        # 可选。entry 的相对资源，走同一路径前
 - **与 Revlm v1 的差异**：删除 `backend/<amd|arm>/` 平台目录——LiveAgent 没有原生
   二进制插件面，前端 ESM 就是唯一执行载体，不存在双架构产物与"当前平台缺失即报错"。
 
-安装路径复用 Skills 已成熟的 stage-then-swap 模式（`src-tauri/src/services/skills.rs`），
-读者永远看不到半成品。
+安装路径复用 Skills 已成熟的 stage-then-swap 模式
+（`crates/agent-gui/src-tauri/src/services/skills/install.rs`），读者永远看不到半成品。
 
 ---
 
@@ -104,14 +114,13 @@ frontend/assets/...        # 可选。entry 的相对资源，走同一路径前
 
 - `id`、`version` 只含字母、数字、`-`、`_`、`.`。ID 大小写敏感，改变 ID（含大小写
   变化）表示另一个插件，不表示升级。
-- `type` 是插件**主类别**枚举，未知值不属于有效包（安装被拒）。当前枚举：
-  - `provider`：参与模型协议数据面（对应 Revlm 的 `channel`）。
-  - `tool`：提供工具 bundle。
-  - `ui`：提供前端挂载。
-- **能力面与 `type` 不要求一一对应**：一个 `provider` 插件可以同时注册工具或 UI。
-  实际能力由 `entry.js` 导出的 `register(api)` 声明，`type` 只用于分组与展示
-  （对应 Revlm"`plugin.type` 与 `ChannelGroup.type` 是两个概念"的哲学，进一步简化为
-  能力面 = 注册声明，`type` = 主类别标签）。
+- `type` 是插件**主类别**枚举，未知值不属于有效包（安装被拒）。**v1 只认 `provider`**，
+  `tool`/`ui` 值安装时拒绝（未实现，不预留）：
+  - `provider`：参与模型协议数据面。`type` 即协议 id 的来源（见 §4），协议 id = `plugin:<id>`。
+- **能力面与 `type` 不要求一一对应**：实际能力由 `entry.js` 导出的 `register(api)` 声明，
+  `type` 只用于分组与展示（对应 Revlm"`plugin.type` 与 `ChannelGroup.type` 是两个概念"
+  的哲学，进一步简化为能力面 = 注册声明，`type` = 主类别标签）。v1 仅实现 `provider`
+  能力面，`tool`/`ui` 能力面后补。
 
 ---
 
@@ -125,30 +134,62 @@ import type { PluginApi } from "@liveagent/plugin-api";
 
 export function register(api: PluginApi): void {
   api.registerProvider({
-    providerId: "my-provider",
+    providerId: "my-provider",      // 协议 id 的后缀；协议 id = plugin:<plugin.json.id>
     label: "My Provider",
-    // 流式/非流式协议适配、payload 构造、usage 解析等
-    buildStream: (req, opts) => /* ... */,
-  });
-
-  api.registerToolBundle({
-    groupId: "my-provider-tools",
-    tools: [
-      /* BuiltinToolBundle 形状 */
+    models: [
+      { id: "deepseek-chat", contextWindow: 65536, maxOutputToken: 8192 },
     ],
+    createModel: (params) => ({
+      // 返回"一个能用的 model"——核心按 model.api 走现有 streamSimpleByApi 流式管道
+      api: "openai-completions",   // 复用现有协议，v1 不写 buildStream
+      id: params.modelId,
+      baseUrl: params.baseUrl,
+      maxTokens: 8192,
+      contextWindow: 65536,
+    }),
   });
 }
 ```
 
-加载机制（实现期定稿，两条候选，以 Rust/WebView 实际能力为准）：
-1. Tauri 资产协议动态 `import` 插件目录下 `frontend/entry.js`；
-2. Rust 读取插件文件，经 asset 前缀注入 WebView。
+### 协议 id
 
-`PluginApi` 是核心对插件暴露的**唯一表面**，等价于 Revlm 的"插件 hook 集合"：
-- `registerProvider(...)`：注入 provider adapter。
-- `registerToolBundle(...)`：注入工具 bundle（复用 `BuiltinToolBundle` 形状）。
-- `registerUi(...)`：声明 UI 挂载点。
-- `store`：经 Tauri command 的只读/受限读写访问，见 §7。
+插件 provider 的协议 id = **`plugin:<plugin.json.id>`**。`registerProvider.providerId`
+字段实际就是插件包 id（协议 id 即 `plugin:<id>`）。一个插件包绑定一个 provider 协议。
+
+- `ProviderId` union 扩展为：内置四协议（`claude_code`/`codex`/`gemini`/`xai`）+ 插件协议
+  id（`plugin:<id>`）。
+- 冲突策略：`plugin:<id>` 前缀与内置协议天然隔离；两个插件若注册相同 `plugin:<id>`，安装时
+  先到先得、后装者拒绝（见 §7）。
+
+### 模型目录
+
+模型列表声明在**插件内部**（`registerProvider.models`），**不进 `plugin.json`**——它跟着
+协议适配逻辑走，是运行时注册的一部分。插件协议 tab 用这些 `models` 预填模型选择器；
+同一协议创建的多个 provider 实例共享这份初始列表（实例内 `activeModels` 可单独启停）。
+
+### `createModel`：复用现有协议，不写 `buildStream`
+
+v1 插件 provider **复用现有模型协议**，核心按 `createModel` 返回的 `model.api` 交给现有
+`streamSimpleByApi` 管道。插件只声明协议 + 构造 model，**不写 `buildStream`**：
+
+- `createModel(params)` 返回 `{ api, id, baseUrl, maxTokens?, contextWindow? }`，
+  `api ∈ { anthropic-messages, openai-completions, openai-responses, google-generative-ai }`。
+- 核心在 `createModelFromConfig` 的 `plugin:<id>` 分支调用插件注入的 `createModel`，
+  产出 `Model` 后走 `streamSimpleByApi`（按 `model.api` 分派到现有流式实现）。
+- **插件自管 Model 构造**：contextWindow/maxTokens 等元数据由插件声明，核心不猜。
+- `buildStream` 在 v1 **砍掉**。仅当未来需要支持 pi-ai 不认识的私有协议时才引入。
+
+### 加载机制（v1 定稿：候选 1）
+
+插件 `frontend/entry.js` 经 **Tauri 资产协议动态 `import`** 加载；`register(api)` 时核心把
+`api` 注入。实现细节以 Rust/WebView 实际能力为准（候选 2 仅作兜底）。
+
+### `PluginApi` 是核心对插件暴露的**唯一表面**，等价于 Revlm 的"插件 hook 集合"：
+
+- `registerProvider(...)`：注入 provider adapter（v1 实现）。
+- `registerToolBundle(...)`：注入工具 bundle（后补，复用 `BuiltinToolBundle` 形状）。
+- `registerUi(...)`：声明 UI 挂载点（后补）。
+- `store`：只读写插件自身命名空间（`plugin:<id>:*`），经 Tauri command，见 §7。
 
 ---
 
@@ -160,11 +201,16 @@ LiveAgent 的对应物是 provider 层：`providerId → adapter → stream adap
 | Revlm | LiveAgent 落点 |
 |---|---|
 | `/v1` 核心唯一协议入口 | `src/lib/providers/llm.ts`、`runtime/modelFactory.ts`、`runtime/streamByApi.ts` |
-| 插件 hook（`revlm_handle_v1` 等） | provider adapter（构造 payload / 流解析 / usage 提取） |
-| 模型目录由插件管理 | `src/lib/models/modelCatalog.ts`、`provider_models.rs` 的 provider 模型目录 |
-| `Model.id` 在 ChannelGroup.type 作用域内有效 | providerId 作用域内的模型 id 唯一 |
-| 协议 usage 语义归插件 | provider adapter 返回的 usage 快照（`lib/providers/usageQuery*`） |
-| 插件可以注册普通全局端点 | 插件可以注册工具 bundle 与 UI（无 HTTP 端点面，见下） |
+| 插件 hook（`revlm_handle_v1` 等） | 插件 provider 的 `createModel`（返回能用的 model，复用现有协议；v1 不写 `buildStream`） |
+| 模型目录由插件管理 | 插件内部 `registerProvider.models`（v1 模型目录在插件内声明，不进 plugin.json） |
+| `Model.id` 在 ChannelGroup.type 作用域内有效 | providerId 作用域内的模型 id 唯一；插件 provider 作用域 = `plugin:<id>` |
+| 协议 usage 语义归插件 | v1 不做 usage/nativeWebSearch；插件 provider 只做纯协议流式（后补） |
+| 插件可以注册普通全局端点 | v1 无 HTTP 端点面；`registerToolBundle`/`registerUi` 后补 |
+
+**插件 provider 的协议分发**：`providerId → adapter → stream adapter` 对插件 provider 具体化为
+`plugin:<id> → createModel → streamSimpleByApi`。`createModelFromConfig` 对 `plugin:<id>` 分支调用
+插件注入的 `createModel`，产出 `Model` 后按 `model.api` 走现有流式管道（`streamSimpleByApi`），
+核心不新增协议分支。
 
 **与 Revlm 的核心差异**：LiveAgent 无"插件注册全局 HTTP 端点"能力（桌面应用没有
 `httplib::Server` 那样的共享路由表；网关是 Go，不加载前端插件）。Revlm 的
@@ -180,9 +226,17 @@ LiveAgent 的对应物是 provider 层：`providerId → adapter → stream adap
 |---|---|
 | 安装 / 更新 | stage-then-swap 原子替换 `~/.liveagent/plugins/<id>/`；同 ID 覆盖，无版本并存、无手动回滚。 |
 | 启用 / 禁用 | `~/.liveagent/config.sqlite` 的 `plugins` 表记录启用状态；禁用插件不参与冷启动加载。 |
-| 卸载 | 直接删除插件目录；无 pending/cleanup 机制（无插件数据库需要清理）。 |
+| 卸载 | 删除插件目录 + 清 `plugin_data` 表中该插件的行（见下）；无 pending/cleanup 机制（无插件数据库需要清理）。 |
 | 生效时机 | **下一次冷启动**。运行中不热加载、不热卸载，避免运行时状态不一致（同 Revlm ADR 0001）。 |
 | 失败语义 | 单个插件加载失败（语法错误/异常/资源缺失）→ 仅禁用该插件并告警，主应用继续启动。 |
+
+**插件管理页（v1 范围）**：本地 `.liveagent-plugin` 文件**导入**（校验 + 解压 + staging→rename）、
+已装插件**列表**（含启用/禁用开关）、**卸载**。复用 `services/skills/install.rs` 的 stage-then-swap
+模式（安装路径真实存在，见 `crates/agent-gui/src-tauri/src/services/skills/install.rs`）。
+
+**插件数据（`api.store`）落点**：`config.sqlite` 新建 `plugin_data` 表，主键 `(plugin_id, key)`。
+插件经 `api.store.get/set` 只读写**自身命名空间**（`plugin:<id>:*`），与其他插件/内置数据隔离。
+卸载时按 `plugin_id` 删除该插件全部行。
 
 **砍掉 migrate/cleanup 的原因**（对应 Revlm ADR 0002 的逆决策）：
 Revlm 的插件各自拥有数据库表，所以需要 `revlm_plugin_migrate()`（幂等迁移、失败阻止
@@ -203,6 +257,9 @@ worker 启动）与 `revlm_plugin_cleanup()`（卸载清理、失败标记重试
 - 工具名冲突：复用 `builtinRegistry.ts` 既有策略——第三方来源（MCP/插件）撞车时
   **先到先得、跳过后来者并告警，绝不 throw 打断整轮**；仅两侧都是可信内置组时才 throw
   （编译期开发 bug）。
+- **插件协议 id 冲突**：协议 id 用 `plugin:<id>` 前缀，与内置四协议天然隔离；两个插件若
+  注册相同 `plugin:<id>`，**安装时先到先得、后装者拒绝**（不静默跳过——协议 id 是安装面
+  的硬冲突，区别于工具名的运行时先到先得）。
 - 插件加载失败只影响该插件，不阻塞主应用（见 §6 失败语义）。
 
 ---
@@ -233,29 +290,43 @@ worker 启动）与 `revlm_plugin_cleanup()`（卸载清理、失败标记重试
 | 插件前端错误阻止应用启动 | 降级为"仅禁用该插件"，不拖垮主应用（比 Revlm 更宽容）。 |
 | 多版本并存 / 回滚 / 沙箱 / 签名 | 产品不需要（同 Revlm ADR 0001 已否决）。 |
 | 热加载 | 冷启动生效，避免运行时状态不一致（同 Revlm ADR 0001）。 |
+| 插件写 `buildStream`（私有协议适配） | v1 复用现有 `model.api` 协议；`buildStream` 仅当未来需私有协议时引入。 |
+| 插件 provider 的 usage 查询 / 原生搜索 | v1 只做纯协议流式；usage/nativeWebSearch 是内置 provider 增值能力，后补。 |
 
 ---
 
 ## 10. 实施路径（后续里程碑）
 
-| 阶段 | 内容 | 关键文件 |
-|---|---|---|
-| 1 | 定清单 + 目录约定 + `PluginApi` 类型 | 新建 `src/lib/plugins/*` |
-| 2 | 冷启动扫描加载器（扫描目录 → import entry → register） | Rust `services/plugins.rs`、前端 `lib/plugins/*` |
-| 3 | provider 分发改造（硬编码 dispatch → 注册表） | `lib/providers/llm.ts`、`runtime/modelFactory.ts` |
-| 4 | 工具 bundle 注册（复用 `BuiltinToolBundle`） | `lib/tools/builtinRegistry.ts` |
-| 5 | 安装 / 更新 / 卸载 UX（stage-then-swap） | `services/skills.rs` 模式复用 |
-| 6 | UI 挂载点 | Settings/Plugins 页、Hub |
+| 阶段 | 内容 | 关键文件 | v1 |
+|---|---|---|---|
+| 1 | 定清单 + 目录约定 + `PluginApi` 类型 | 新建 `src/lib/plugins/*` | ✅ |
+| 2 | 冷启动扫描加载器（扫描目录 → import entry → register） | Rust `services/plugins.rs`、前端 `lib/plugins/*` | ✅ |
+| 3 | provider 分发改造（`createModelFromConfig` 对 `plugin:<id>` 分支调插件 `createModel`） | `lib/providers/llm.ts`、`runtime/modelFactory.ts` | ✅ |
+| 5 | 插件管理页（导入 + 列表 + 启停 + 卸载，stage-then-swap） | `services/skills/install.rs` 模式复用 | ✅ |
+| 4 | 工具 bundle 注册（复用 `BuiltinToolBundle`） | `lib/tools/builtinRegistry.ts` | 后补 |
+| 6 | UI 挂载点 | Settings/Plugins 页、Hub | 后补 |
 
 ---
 
-## 11. 待 grill 的决策
+## 11. v1 决策账本（2026-08-03 grill 已定）
 
-1. `type` 枚举是否需要 `tool`/`ui` 两个类别，还是合并为单一类别 + 能力面声明？
-2. `PluginApi.registerUi` 的挂载点形态（Settings 面板 vs Hub 卡片 vs 全应用路由）？
-3. 插件是否允许通过 Rust 侧受控 proxy 暴露本地 HTTP 端点（`services/proxy.rs` 扩展）？
-4. 插件数据的持久化边界：settings 命名空间 vs 独立 store，是否需要配额？
-5. 插件包的签名/来源校验是否需要（当前建议：不需要，与 Revlm 一致）。
+| 决策点 | v1 定论 |
+|---|---|
+| 落地范围 | provider 注入闭环 + 管理页 CRUD（阶段 1-3 + 5 UX）。tool/ui、proxy、usage 后补。 |
+| 安装路径 | 管理页本地导入 `.liveagent-plugin`（校验 + 解压 + staging→rename）。 |
+| 管理页功能 | 导入 + 列表 + 启停 + 卸载。 |
+| 插件运行时面 | 纯前端 ESM + 核心内建库（Tauri 无运行期动态加载编译插件，无稳定 ABI）。 |
+| `api` 能力 | `registerProvider` + `store`（只读写自身命名空间）。`registerToolBundle`/`registerUi` 占位后补。 |
+| `type` 枚举 | v1 只认 `provider`；`tool`/`ui` 安装时拒绝。 |
+| 插件 = 协议 | 插件 provider 是 `plugin:<id>` 协议，供应商配置里与内置四协议并列；一协议可被多 provider 实例复用。 |
+| 模型目录来源 | 插件内部 `registerProvider.models`，不进 plugin.json；协议 tab 预填，实例共享初始列表。 |
+| 模型进选择器 | 协议 tab 预填（不合并进全局目录，不合成 customProviders 条目）。 |
+| `buildStream`/`createModel` 接缝 | 插件自管 Model 构造；`createModel` 返回可用 model（`api ∈` 现有四协议），核心走 `streamSimpleByApi`；**不写 `buildStream`**。 |
+| 协议 id | `plugin:<plugin.json.id>`；一个插件包绑定一个协议。 |
+| 数据持久化 | `config.sqlite` `plugin_data` 表，主键 `(plugin_id, key)`，只读写自身命名空间。 |
+| HTTP 端点面 | v1 不做（无 `api.proxy`）。 |
+| 签名/来源校验 | 不校验（完全信任）。 |
+| 协议 id 冲突 | `plugin:<id>` 前缀与内置隔离；两插件撞 `plugin:<id>` → 安装先到先得、后装拒绝。 |
 
 ---
 
@@ -266,5 +337,6 @@ worker 启动）与 `revlm_plugin_cleanup()`（卸载清理、失败标记重试
 - Revlm ADR：`/Users/realm/revlm/docs/adr/0001-0005`
 - Revlm 决策账本：`/Users/realm/revlm/docs/plugin-design-decision-ledger.md`
 - LiveAgent 工具注册：`crates/agent-gui/src/lib/tools/builtinRegistry.ts`、`docs/features/tools.md`
-- LiveAgent Skills 安装（stage-then-swap）：`docs/features/skills-and-mcp.md`
+- LiveAgent Skills 安装（stage-then-swap）：`crates/agent-gui/src-tauri/src/services/skills/install.rs`、`docs/features/skills-and-mcp.md`
 - LiveAgent provider 层：`crates/agent-gui/src/lib/providers/llm.ts`、`runtime/*`
+- LiveAgent 供应商配置 UI：`crates/agent-gui/src/pages/settings/ProvidersSection.tsx`
