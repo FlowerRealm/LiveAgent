@@ -279,7 +279,7 @@ location / {
 | **Agent GUI** · 样式 | Tailwind CSS 4 + Radix UI |
 | **Agent GUI** · 渲染 | streamdown + KaTeX + Mermaid + Monaco Editor |
 | **Agent GUI** · 后端 | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
-| **Agent GUI** · LLM | @earendil-works/pi-ai · @openai/codex-sdk · claude-agent-sdk |
+| **Agent GUI** · LLM | @earendil-works/pi-ai · @earendil-works/pi-agent-core |
 | **Gateway** · 语言 | Go 1.25 |
 | **Gateway** · 协议 | WebSocket + Protobuf + HTTP |
 | **Gateway** · Web UI | React + Vite + Tailwind CSS(嵌入式) |

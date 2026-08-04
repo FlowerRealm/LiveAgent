@@ -420,12 +420,7 @@ export function useSendChatTurn(params: UseSendChatTurnParams) {
       gatewayBridgeRequest?.runtimeControlsOverride ??
       overrides?.runtimeControlsOverride ??
       settings.chatRuntimeControls;
-    const providerConfig = createProviderRuntimeConfig(
-      provider,
-      model,
-      runtimeControls,
-      settings.customSettings.providerIdentities,
-    );
+    const providerConfig = createProviderRuntimeConfig(provider, model, runtimeControls);
     const memorySummaryModelSelection = resolveMemorySummaryModelSelection(settings);
     const memoryExtractionModel = memorySummaryModelSelection
       ? {
@@ -435,7 +430,6 @@ export function useSendChatTurn(params: UseSendChatTurnParams) {
             memorySummaryModelSelection.provider,
             memorySummaryModelSelection.model,
             runtimeControls,
-            settings.customSettings.providerIdentities,
           ),
           selectedModel: memorySummaryModelSelection.selectedModel,
         }
@@ -608,7 +602,6 @@ export function useSendChatTurn(params: UseSendChatTurnParams) {
         titleModelSelection.provider,
         titleModelSelection.model,
         runtimeControls,
-        settings.customSettings.providerIdentities,
       );
       titlePromise = startConversationTitleJob({
         providerId: titleModelSelection.providerId,
