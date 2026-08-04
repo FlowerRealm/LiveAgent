@@ -279,7 +279,7 @@ Expand the Development Guide below for the full set of Make commands.
 | **Agent GUI** · Styling | Tailwind CSS 4 + Radix UI |
 | **Agent GUI** · Rendering | streamdown + KaTeX + Mermaid + Monaco Editor |
 | **Agent GUI** · Backend | Rust + Tokio + SQLite (rusqlite) + WebSocket (tokio-tungstenite) |
-| **Agent GUI** · LLM | @earendil-works/pi-ai · @openai/codex-sdk · claude-agent-sdk |
+| **Agent GUI** · LLM | @earendil-works/pi-ai · @earendil-works/pi-agent-core |
 | **Gateway** · Language | Go 1.25 |
 | **Gateway** · Protocols | WebSocket + Protobuf + HTTP |
 | **Gateway** · Web UI | React + Vite + Tailwind CSS (embedded) |
