@@ -36,16 +36,6 @@ pub fn load_gateway_settings_sync_snapshot(conn: &Connection) -> Result<Value, S
         "memory".to_string(),
         load_memory(conn)?.unwrap_or(Value::Object(Map::new())),
     );
-    let remote = load_remote_settings(conn)?;
-    snapshot.insert(
-        "remote".to_string(),
-        json!({
-            "enableWebTerminal": remote.enable_web_terminal,
-            "enableWebSshTerminal": remote.enable_web_ssh_terminal,
-            "enableWebGit": remote.enable_web_git,
-            "enableWebTunnels": remote.enable_web_tunnels,
-        }),
-    );
     // UI-only fields (theme, locale, selectedModel, skills, chatRuntimeControls,
     // customSettings) live in the webview's localStorage, not in this DB. They are
     // deliberately omitted here: merge_settings_sync_snapshot overlays the cached
@@ -93,9 +83,6 @@ pub fn redact_gateway_settings_sync_payload(payload: Value) -> Result<Value, Str
     }
     if let Some(ssh) = snapshot.remove("ssh") {
         snapshot.insert("ssh".to_string(), redact_ssh_settings(ssh)?);
-    }
-    if let Some(remote) = snapshot.remove("remote") {
-        snapshot.insert("remote".to_string(), redact_remote_settings(remote)?);
     }
     Ok(Value::Object(snapshot))
 }

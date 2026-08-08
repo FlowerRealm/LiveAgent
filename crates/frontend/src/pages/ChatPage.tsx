@@ -710,10 +710,8 @@ export function ChatPage(props: ChatPageProps) {
   const terminalDisabledMessage = !terminalProjectPath
     ? "Select a project to use project tools."
     : undefined;
-  const tunnelEnabled = settings.remote.enableWebTunnels === true;
-  const tunnelDisabledMessage = !settings.remote.enableWebTunnels
-    ? t("projectTools.tunnelWebDisabled")
-    : undefined;
+  const tunnelEnabled = true;
+  const tunnelDisabledMessage: string | undefined = undefined;
   // RightDockPanel is memo'd: every callback handed to it must be stable or
   // the memo boundary is void (see the panel-side context useMemo).
   const handleChatTranscriptWidthChange = useCallback(

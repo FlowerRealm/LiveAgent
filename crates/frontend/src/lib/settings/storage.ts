@@ -216,7 +216,6 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     mcp: (persisted?.mcp ?? defaults.mcp) as AppSettings["mcp"],
     agents: (persisted?.agents ?? defaults.agents) as AppSettings["agents"],
     ssh: (persisted?.ssh ?? defaults.ssh) as AppSettings["ssh"],
-    remote: (persisted?.remote ?? defaults.remote) as AppSettings["remote"],
     memory: (persisted?.memory ?? defaults.memory) as AppSettings["memory"],
     skills: localUi.skills,
     chatRuntimeControls: localUi.chatRuntimeControls,
@@ -298,14 +297,6 @@ export async function persistSettings(
           result.conflict = response.conflict;
         }
       }),
-    );
-  }
-
-  if (hasChanged(prev.remote, next.remote)) {
-    tasks.push(
-      invoke("settings_save_remote", {
-        payload: next.remote,
-      } as any),
     );
   }
 

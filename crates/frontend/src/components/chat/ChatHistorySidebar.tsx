@@ -5,6 +5,12 @@ import iconSimpleUrl from "../../../src-tauri/icons/icon-simple.png";
 import { useLocale } from "../../i18n";
 import type { AppUpdateController } from "../../lib/appUpdates";
 import {
+  clearStoredEndpoint,
+  isDesktopShell,
+  peekStoredEndpoint,
+  resetEndpoint,
+} from "../../lib/backend/endpoint";
+import {
   DEFAULT_WORKSPACE_PROJECT_ID,
   type WorkspaceProject,
   workspaceProjectPathKey,
@@ -33,6 +39,7 @@ import {
   FolderClosed,
   FolderOpen,
   FolderTree,
+  Globe,
   ListChecks,
   Loader2,
   MoreHorizontal,
@@ -2131,6 +2138,36 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
           </div>
         </div>
         <div className="shrink-0 border-t border-border/50 bg-[hsl(var(--sidebar-bg))] px-2 py-1.5">
+          {(() => {
+            const remoteEndpoint = peekStoredEndpoint();
+            if (!remoteEndpoint) return null;
+            const canReturnToLocal = isDesktopShell();
+            return (
+              <div className="mb-1 flex items-center justify-between gap-1.5 rounded-lg bg-sky-500/10 px-2.5 py-1.5">
+                <div className="flex min-w-0 items-center gap-1.5 text-[calc(11px*var(--zone-font-scale,1))] text-sky-600 dark:text-sky-400">
+                  <Globe className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {remoteEndpoint.host}:{remoteEndpoint.port}
+                  </span>
+                </div>
+                {canReturnToLocal ? (
+                  <button
+                    type="button"
+                    className="shrink-0 rounded px-1.5 py-0.5 text-[calc(11px*var(--zone-font-scale,1))] text-sky-600 hover:bg-sky-500/15 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                    onClick={() => {
+                      clearStoredEndpoint();
+                      resetEndpoint();
+                      const url = new URL(window.location.href);
+                      url.search = "";
+                      window.location.assign(url);
+                    }}
+                  >
+                    {t("sidebar.returnToLocal")}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })()}
           <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <Button
               type="button"

@@ -133,7 +133,6 @@ macro_rules! app_invoke_handler {
             tauri_commands::settings::settings_apply_ssh_patch,
             tauri_commands::settings::provider_models_fetch,
             tauri_commands::settings::settings_reset_ssh_known_host,
-            tauri_commands::settings::settings_save_remote,
             tauri_commands::settings::settings_save_memory,
             commands::update::app_update_check,
             commands::update::app_update_install,

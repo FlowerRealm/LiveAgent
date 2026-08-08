@@ -1841,22 +1841,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.backendServerTitle": "后端服务器",
     "settings.backendServerEmbedded": "本机内嵌后端",
     "settings.backendServerChange": "切换…",
-    "settings.remoteEnable": "启用远程访问",
-    "settings.remoteDisable": "关闭远程访问",
-    "settings.remoteAccessControl": "访问控制",
-    "settings.remoteAccessControlHint":
-      "逐项授权：只有在这里打开的能力，已登录的远程前端才能使用。",
-    "settings.remoteWebTerminal": "允许 WebUI Terminal",
-    "settings.remoteWebTerminalHint": "开启后，已登录 WebUI 可启动并控制本机项目终端。",
-    "settings.remoteWebSshTerminal": "允许 WebUI SSH Terminal",
-    "settings.remoteWebSshTerminalHint":
-      "开启后，已登录 WebUI 可使用本机保存的 SSH 配置创建和控制远程交互式终端。",
-    "settings.remoteWebGit": "允许 WebUI Git",
-    "settings.remoteWebGitHint":
-      "开启后，已登录 WebUI 可对本机项目执行分支、暂存、提交和同步操作。",
-    "settings.remoteWebTunnels": "允许 WebUI 内网穿透",
-    "settings.remoteWebTunnelsHint":
-      "开启后，已登录 WebUI 可为 localhost 或 IP 地址 HTTP 服务创建和关闭临时访问链接。",
+    "settings.backendServerReturnLocal": "切回本地后端",
+    "settings.connectionModeRemote": "当前正以远程模式连接到此后端",
+    "sidebar.remoteMode": "远程模式",
+    "sidebar.returnToLocal": "切回本地",
 
     /* ── MCP Hub ── */
     "mcpHub.title": "MCP Servers",
@@ -4128,23 +4116,10 @@ export const translations: Record<Locale, Record<string, string>> = {
     "settings.backendServerTitle": "Backend Server",
     "settings.backendServerEmbedded": "Embedded local backend",
     "settings.backendServerChange": "Change…",
-    "settings.remoteEnable": "Enable remote access",
-    "settings.remoteDisable": "Disable remote access",
-    "settings.remoteAccessControl": "Access Control",
-    "settings.remoteAccessControlHint":
-      "Grant capabilities one by one: authenticated remote clients can only use what is enabled here.",
-    "settings.remoteWebTerminal": "Allow WebUI Terminal",
-    "settings.remoteWebTerminalHint":
-      "Allow authenticated WebUI clients to start and control local project terminals.",
-    "settings.remoteWebSshTerminal": "Allow WebUI SSH Terminal",
-    "settings.remoteWebSshTerminalHint":
-      "Allow authenticated WebUI clients to create and control remote interactive terminals using SSH profiles saved on this desktop.",
-    "settings.remoteWebGit": "Allow WebUI Git",
-    "settings.remoteWebGitHint":
-      "Allow authenticated WebUI clients to run branch, stage, commit, and sync operations on local projects.",
-    "settings.remoteWebTunnels": "Allow WebUI Tunnels",
-    "settings.remoteWebTunnelsHint":
-      "Allow authenticated WebUI clients to create and close temporary links for localhost or IP-address HTTP services.",
+    "settings.backendServerReturnLocal": "Return to local backend",
+    "settings.connectionModeRemote": "Currently connected to this backend in remote mode",
+    "sidebar.remoteMode": "Remote",
+    "sidebar.returnToLocal": "Return to local",
 
     /* ── MCP Hub ── */
     "mcpHub.title": "MCP Servers",

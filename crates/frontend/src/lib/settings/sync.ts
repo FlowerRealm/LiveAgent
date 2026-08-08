@@ -53,10 +53,6 @@ export type GatewaySettingsSyncPayload = {
   mcp: AppSettings["mcp"];
   agents: AppSettings["agents"];
   ssh: AppSettings["ssh"];
-  remote?: Pick<
-    AppSettings["remote"],
-    "enableWebTerminal" | "enableWebSshTerminal" | "enableWebGit" | "enableWebTunnels"
-  >;
   memory: AppSettings["memory"];
   customSettings: GatewaySettingsSyncCustomSettings;
   skills: AppSettings["skills"];
@@ -80,7 +76,6 @@ const GATEWAY_SETTINGS_SYNC_FIELDS = [
   "mcp",
   "agents",
   "ssh",
-  "remote",
   "memory",
   "customSettings",
   "skills",
@@ -780,36 +775,6 @@ function mergeSyncedCustomProviders(
   }) as AppSettings["customProviders"];
 }
 
-function mergeSyncedRemoteSettings(
-  current: AppSettings["remote"],
-  incoming: unknown,
-): AppSettings["remote"] {
-  const source = asObject(incoming);
-  if (
-    !Object.hasOwn(source, "enableWebTerminal") &&
-    !Object.hasOwn(source, "enableWebSshTerminal") &&
-    !Object.hasOwn(source, "enableWebGit") &&
-    !Object.hasOwn(source, "enableWebTunnels")
-  ) {
-    return current;
-  }
-  return {
-    ...current,
-    enableWebTerminal: Object.hasOwn(source, "enableWebTerminal")
-      ? source.enableWebTerminal === true
-      : current.enableWebTerminal,
-    enableWebSshTerminal: Object.hasOwn(source, "enableWebSshTerminal")
-      ? source.enableWebSshTerminal === true
-      : current.enableWebSshTerminal,
-    enableWebGit: Object.hasOwn(source, "enableWebGit")
-      ? source.enableWebGit === true
-      : current.enableWebGit,
-    enableWebTunnels: Object.hasOwn(source, "enableWebTunnels")
-      ? source.enableWebTunnels === true
-      : current.enableWebTunnels,
-  };
-}
-
 function mergeSyncedSshSettings(
   current: AppSettings["ssh"],
   incoming: unknown,
@@ -1060,12 +1025,6 @@ export function buildGatewaySettingsSyncPayload(
     mcp: settings.mcp,
     agents: settings.agents,
     ssh: redactSshSettingsForGateway(settings.ssh),
-    remote: {
-      enableWebTerminal: settings.remote.enableWebTerminal,
-      enableWebSshTerminal: settings.remote.enableWebSshTerminal,
-      enableWebGit: settings.remote.enableWebGit,
-      enableWebTunnels: settings.remote.enableWebTunnels,
-    },
     memory: settings.memory,
     customSettings: syncableCustomSettings(settings.customSettings),
     skills: settings.skills,
@@ -1225,8 +1184,5 @@ export function applyGatewaySettingsSyncPayload(
     selectedModel,
     theme: (source.theme as AppSettings["theme"] | undefined) ?? current.theme,
     locale: (source.locale as AppSettings["locale"] | undefined) ?? current.locale,
-    remote: Object.hasOwn(source, "remote")
-      ? mergeSyncedRemoteSettings(current.remote, source.remote)
-      : current.remote,
   });
 }

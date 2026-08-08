@@ -8,7 +8,6 @@ pub async fn settings_load_all() -> Result<SettingsLoadResponse, String> {
             mcp: load_mcp(&conn)?,
             agents: load_agents(&conn)?,
             ssh: load_ssh(&conn)?,
-            remote: load_remote(&conn)?,
             memory: load_memory(&conn)?,
             default_workdir,
         })
@@ -50,21 +49,6 @@ pub async fn settings_save_mcp(payload: Value) -> Result<(), String> {
     })
     .await
     .map_err(|e| format!("settings_save_mcp join 失败：{e}"))?
-}
-
-/// 保存远程访问控制设置（远程前端能开终端 / SSH / Git / 隧道吗）。
-///
-/// 保存完只往总线上发一条 `settings:remote-saved`，payload 是**落库后的结果**
-/// 而不是入参：订阅者要的是「现在是什么」，不是「谁请求了什么」。
-pub async fn settings_save_remote(payload: Value, events: &Arc<EventBus>) -> Result<(), String> {
-    let normalized = tokio::task::spawn_blocking(move || {
-        let conn = open_db()?;
-        save_remote(&conn, payload)
-    })
-    .await
-    .map_err(|e| format!("settings_save_remote join 失败：{e}"))??;
-    events.emit(SETTINGS_REMOTE_SAVED_EVENT, &normalized);
-    Ok(())
 }
 
 pub async fn settings_save_memory(payload: Value) -> Result<(), String> {

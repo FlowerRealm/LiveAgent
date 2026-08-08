@@ -2843,27 +2843,6 @@ mod settings_save_providers {
     }
 }
 
-mod settings_save_remote {
-    use super::*;
-    use crate::commands::settings::*;
-    use crate::events::EventBus;
-    use crate::runtime::project_path::project_path_key as normalize_project_path_key;
-    use crate::services::automation::AutomationScheduler;
-
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct SettingsSaveRemoteRouteArgs {
-        payload: Value,
-    }
-
-    pub async fn handle(
-    State(state): State<AppState>,
-    Json(args): Json<SettingsSaveRemoteRouteArgs>,
-    ) -> Response {
-        respond(crate::commands::settings::settings_save_remote(args.payload, &state.events).await)
-    }
-}
-
 mod settings_save_system {
     use super::*;
     use crate::commands::settings::*;
@@ -4310,7 +4289,6 @@ pub fn gen_router() -> Router<AppState> {
         .route("/settings_save_mcp", post(settings_save_mcp::handle))
         .route("/settings_save_memory", post(settings_save_memory::handle))
         .route("/settings_save_providers", post(settings_save_providers::handle))
-        .route("/settings_save_remote", post(settings_save_remote::handle))
         .route("/settings_save_system", post(settings_save_system::handle))
         .route("/sftp_cancel_transfer", post(sftp_cancel_transfer::handle))
         .route("/sftp_delete", post(sftp_delete::handle))
@@ -4497,7 +4475,6 @@ pub const ROUTED_COMMANDS: &[&str] = &[
     "settings_save_mcp",
     "settings_save_memory",
     "settings_save_providers",
-    "settings_save_remote",
     "settings_save_system",
     "sftp_cancel_transfer",
     "sftp_delete",

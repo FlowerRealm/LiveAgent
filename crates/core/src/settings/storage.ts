@@ -56,7 +56,6 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     mcp: (persisted?.mcp ?? defaults.mcp) as AppSettings["mcp"],
     agents: (persisted?.agents ?? defaults.agents) as AppSettings["agents"],
     ssh: (persisted?.ssh ?? defaults.ssh) as AppSettings["ssh"],
-    remote: (persisted?.remote ?? defaults.remote) as AppSettings["remote"],
     memory: (persisted?.memory ?? defaults.memory) as AppSettings["memory"],
     skills: defaults.skills,
     chatRuntimeControls: defaults.chatRuntimeControls,

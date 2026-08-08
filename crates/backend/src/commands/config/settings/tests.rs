@@ -29,7 +29,7 @@ mod tests {
             MCP_SETTINGS_TABLE,
             AGENT_PROMPT_TEMPLATES_TABLE,
             SSH_SETTINGS_TABLE,
-            REMOTE_SETTINGS_TABLE,
+            "remote_settings",
             MEMORY_SETTINGS_TABLE,
             SSH_PROJECT_HOST_ASSOCIATIONS_TABLE,
             SSH_KNOWN_HOSTS_TABLE,
@@ -103,126 +103,6 @@ mod tests {
         let snapshot =
             load_gateway_settings_sync_snapshot(&conn).expect("load gateway settings snapshot");
         assert_eq!(snapshot["memory"], payload);
-    }
-
-    #[test]
-    fn remote_settings_default_denies_every_remote_capability() {
-        let defaults = RemoteSettingsPayload::default();
-
-        assert!(!defaults.enabled);
-        assert!(!defaults.enable_web_terminal);
-        assert!(!defaults.enable_web_ssh_terminal);
-        assert!(!defaults.enable_web_git);
-        assert!(!defaults.enable_web_tunnels);
-    }
-
-    #[test]
-    fn save_remote_round_trips_access_control_flags() {
-        let conn = open_memory_db();
-
-        let saved = save_remote(
-            &conn,
-            json!({
-                "enabled": true,
-                "enableWebTerminal": true,
-                "enableWebSshTerminal": false,
-                "enableWebGit": true,
-                "enableWebTunnels": false
-            }),
-        )
-        .expect("save remote settings");
-        let stored = load_remote_settings(&conn).expect("load remote settings");
-
-        assert_eq!(stored, saved);
-        assert!(stored.enabled);
-        assert!(stored.enable_web_terminal);
-        assert!(!stored.enable_web_ssh_terminal);
-        assert!(stored.enable_web_git);
-        assert!(!stored.enable_web_tunnels);
-    }
-
-    // 向后兼容：旧库里那些「连到哪个 Gateway」的键读到就忽略，
-    // 既不迁移也不报错，保留下来的访问控制开关照常生效。
-    #[test]
-    fn load_remote_settings_ignores_legacy_gateway_connection_keys() {
-        let conn = open_memory_db();
-        let legacy = json!({
-            "enabled": true,
-            "gatewayUrl": "https://gateway.example.com",
-            "grpcPort": 8443,
-            "gatewayPort": 8443,
-            "token": "gateway-token",
-            "agentId": "agent-legacy",
-            "autoReconnect": false,
-            "heartbeatInterval": 45,
-            "enableWebTerminal": true
-        });
-        conn.execute(
-            &format!(
-                "INSERT INTO {REMOTE_SETTINGS_TABLE} (config_id, payload_json, updated_at)
-                 VALUES ('default', ?1, ?2)"
-            ),
-            params![legacy.to_string(), now_ms()],
-        )
-        .expect("seed legacy remote settings");
-
-        let loaded = load_remote_settings(&conn).expect("load legacy remote settings");
-
-        assert!(loaded.enabled);
-        assert!(loaded.enable_web_terminal);
-        assert!(!loaded.enable_web_git);
-    }
-
-    // 落库只写当前字段：旧的连接配置在下一次保存后自然消失。
-    #[test]
-    fn save_remote_drops_legacy_gateway_connection_keys() {
-        let conn = open_memory_db();
-        conn.execute(
-            &format!(
-                "INSERT INTO {REMOTE_SETTINGS_TABLE} (config_id, payload_json, updated_at)
-                 VALUES ('default', ?1, ?2)"
-            ),
-            params![
-                json!({ "gatewayUrl": "https://gateway.example.com", "token": "t" }).to_string(),
-                now_ms()
-            ],
-        )
-        .expect("seed legacy remote settings");
-
-        save_remote(&conn, json!({ "enabled": true })).expect("save remote settings");
-        let stored_json = conn
-            .query_row(
-                &format!(
-                    "SELECT payload_json FROM {REMOTE_SETTINGS_TABLE} WHERE config_id = 'default'"
-                ),
-                [],
-                |row| row.get::<_, String>(0),
-            )
-            .expect("load stored remote payload");
-
-        assert!(!stored_json.contains("gatewayUrl"));
-        assert!(!stored_json.contains("token"));
-        assert!(!stored_json.contains("agentId"));
-    }
-
-    #[test]
-    fn remote_settings_sync_snapshot_exposes_only_access_control_flags() {
-        let conn = open_memory_db();
-        save_remote(&conn, json!({ "enabled": true, "enableWebGit": true }))
-            .expect("save remote settings");
-
-        let snapshot =
-            load_gateway_settings_sync_snapshot(&conn).expect("load settings sync snapshot");
-
-        assert_eq!(
-            snapshot["remote"],
-            json!({
-                "enableWebTerminal": false,
-                "enableWebSshTerminal": false,
-                "enableWebGit": true,
-                "enableWebTunnels": false,
-            })
-        );
     }
 
     #[test]

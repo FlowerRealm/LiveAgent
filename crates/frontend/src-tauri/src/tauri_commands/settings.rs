@@ -46,16 +46,6 @@ pub async fn settings_save_mcp(payload: Value) -> Result<(), String> {
     backend::commands::settings::settings_save_mcp(payload).await
 }
 
-// 保存后只发 settings:remote-saved；谁关心远程访问权限变了自己去订阅。
-// State 参数不是 JSON key，前端契约不受影响。
-#[tauri::command]
-pub async fn settings_save_remote(
-    payload: Value,
-    events: tauri::State<'_, Arc<EventBus>>,
-) -> Result<(), String> {
-    backend::commands::settings::settings_save_remote(payload, events.inner()).await
-}
-
 #[tauri::command]
 pub async fn settings_save_memory(payload: Value) -> Result<(), String> {
     backend::commands::settings::settings_save_memory(payload).await

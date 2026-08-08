@@ -405,22 +405,12 @@ const SYSTEM_THEME_MEDIA_QUERY = "(prefers-color-scheme: dark)";
  * 后端的远程访问控制：门控「连过来的远程前端能干什么」。
  * 这里没有「连到哪个 Gateway」——桌面端自己就是后端，不再外拨。
  */
-export type RemoteSettings = {
-  /** 远程访问总开关：关掉后下面几项一律不生效。 */
-  enabled: boolean;
-  enableWebTerminal: boolean;
-  enableWebSshTerminal: boolean;
-  enableWebGit: boolean;
-  enableWebTunnels: boolean;
-};
-
 export type AppSettings = {
   system: SystemSettings;
   customProviders: CustomProvider[];
   mcp: McpSettings;
   agents: AgentPromptTemplate[];
   ssh: SshSettings;
-  remote: RemoteSettings;
   memory: MemorySettings;
   customSettings: CustomSettings;
   updates: UpdateSettings;
@@ -1109,17 +1099,6 @@ function normalizeIntegerInRange(
 ): number {
   const value = normalizePositiveInteger(input, fallback);
   return Math.min(max, Math.max(min, value));
-}
-
-export function normalizeRemoteSettings(input: unknown): RemoteSettings {
-  const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  return {
-    enabled: obj.enabled === true,
-    enableWebTerminal: obj.enableWebTerminal === true,
-    enableWebSshTerminal: obj.enableWebSshTerminal === true,
-    enableWebGit: obj.enableWebGit === true,
-    enableWebTunnels: obj.enableWebTunnels === true,
-  };
 }
 
 function getKnownModelLimits(
@@ -2175,13 +2154,6 @@ export function getDefaultSettings(): AppSettings {
       hosts: [],
       projectHostAssociations: {},
     },
-    remote: {
-      enabled: false,
-      enableWebTerminal: false,
-      enableWebSshTerminal: false,
-      enableWebGit: false,
-      enableWebTunnels: false,
-    },
     memory: normalizeMemorySettings({}, customProviders),
     customSettings: normalizeCustomSettings({}, customProviders),
     updates: normalizeUpdateSettings({}),
@@ -2214,7 +2186,6 @@ export function normalizeSettings(input?: Partial<AppSettings> | null): AppSetti
     mcp: normalizeMcpSettings(obj.mcp ?? defaults.mcp),
     agents: normalizeAgentPromptTemplates(obj.agents ?? defaults.agents),
     ssh: normalizeSshSettings(obj.ssh ?? defaults.ssh),
-    remote: normalizeRemoteSettings(obj.remote ?? defaults.remote),
     memory: normalizeMemorySettings(obj.memory ?? defaults.memory, customProviders),
     customSettings: normalizeCustomSettings(
       obj.customSettings ?? defaults.customSettings,
