@@ -80,7 +80,6 @@ pub(crate) const SSH_LOCAL_FORWARD_MAX_CONNECTIONS: usize = 32;
 pub(crate) const SSH_LOCAL_FORWARD_MAX_GLOBAL_CONNECTIONS: usize = 128;
 pub(crate) const SSH_EXEC_DEFAULT_MAX_BYTES: usize = 64 * 1024;
 pub(crate) const SSH_EXEC_MAX_BYTES: usize = 256 * 1024;
-pub(crate) const SSH_TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 pub(crate) const SSH_EXEC_DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) const SSH_EXEC_MAX_TIMEOUT: Duration = Duration::from_secs(300);
 
