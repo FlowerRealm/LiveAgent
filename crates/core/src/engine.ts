@@ -614,7 +614,7 @@ async function runOneTurn(
       skillAccessPolicy: skillAccessPolicyForTools,
       getMcpSettings: () => settings.mcp,
       getToolPolicies: () => settings.system.toolPolicies,
-      remoteWebTunnelsEnabled: settings.remote.enableWebTunnels,
+      remoteWebTunnelsEnabled: false,
       tunnelPublicBaseUrl: "",
       sshHosts: settings.ssh.hosts,
       sshManagerRemoteAllowed: true,

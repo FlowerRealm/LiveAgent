@@ -27,6 +27,7 @@ struct Args {
     port: u16,
     password: Option<String>,
     engine_bundle: Option<PathBuf>,
+    webui_dir: Option<PathBuf>,
 }
 
 /// 非空环境变量，空串按未设置处理（`FOO=` 是平台 UI 里清空后留下的残渣）。
@@ -38,7 +39,7 @@ fn env_var(name: &str) -> Option<String> {
 /// argv 没给的项从环境变量补齐，之后不再有第二条配置路径。
 fn parse_args() -> Result<Args, String> {
     let mut port: Option<u16> = None;
-    let mut args = Args { port: 0, password: None, engine_bundle: None };
+    let mut args = Args { port: 0, password: None, engine_bundle: None, webui_dir: None };
     let mut data_dir: Option<PathBuf> = None;
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
@@ -55,12 +56,16 @@ fn parse_args() -> Result<Args, String> {
             "--engine-bundle" => {
                 args.engine_bundle = Some(PathBuf::from(take("--engine-bundle")?))
             }
+            "--webui" => {
+                args.webui_dir = Some(PathBuf::from(take("--webui")?))
+            }
             "--data-dir" => data_dir = Some(PathBuf::from(take("--data-dir")?)),
             "--help" | "-h" => {
                 println!(
-                    "backend [--port <PORT>] [--password <PW>] [--engine-bundle <DIR>] [--data-dir <DIR>]\n\
-                     环境变量兜底：PORT、LIVEAGENT_BACKEND_PASSWORD、LIVEAGENT_ENGINE_BUNDLE、LIVEAGENT_DATA_DIR\n\
-                     --engine-bundle 指向 Node 引擎打包产物目录（内含 index.js），不给则纯 API 模式"
+                    "backend [--port <PORT>] [--password <PW>] [--engine-bundle <DIR>] [--webui <DIR>] [--data-dir <DIR>]\n\
+                     环境变量兜底：PORT、LIVEAGENT_BACKEND_PASSWORD、LIVEAGENT_ENGINE_BUNDLE、LIVEAGENT_WEBUI_DIR、LIVEAGENT_DATA_DIR\n\
+                     --engine-bundle 指向 Node 引擎打包产物目录（内含 index.js），不给则纯 API 模式\n\
+                     --webui 指向前端 dist 目录，不给则不 serve 静态页面"
                 );
                 std::process::exit(0);
             }
@@ -77,6 +82,9 @@ fn parse_args() -> Result<Args, String> {
     args.engine_bundle = args
         .engine_bundle
         .or_else(|| env_var("LIVEAGENT_ENGINE_BUNDLE").map(PathBuf::from));
+    args.webui_dir = args
+        .webui_dir
+        .or_else(|| env_var("LIVEAGENT_WEBUI_DIR").map(PathBuf::from));
 
     // 数据目录反着走：backend 的路径解析只认 LIVEAGENT_DATA_DIR 环境变量
     // （见 backend::storage），--data-dir 就翻译成它。这里还在 main 的
@@ -129,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    let app = build_router(state);
+    let app = build_router(state, args.webui_dir);
     let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
 
     // 处理 SIGTERM/SIGINT，确保退出时收掉 pi 子进程。

@@ -65,7 +65,7 @@ pub async fn start_backend_server(
     // 启动 HTTP 服务（运行在后台）。listener 已 bind，内核在排队连接，
     // 此后 spawn 的 Node 引擎随时可以回调。
     // 注意：这里不 await，服务在后台持续运行。如果 tokio runtime 退出，服务自动停止。
-    let app = backend::build_router(state.clone());
+    let app = backend::build_router(state.clone(), None);
     tokio::spawn(async move {
         // 认证只看 Bearer 凭据（Node 引擎带 spawn 时下发的引擎凭据），
         // 对端地址不参与判断，所以不需要 with_connect_info。

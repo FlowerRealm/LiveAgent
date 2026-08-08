@@ -1,0 +1,35 @@
+# 拆分部署：前端 (nginx) + 后端 (backend + core engine)
+#
+# 用法：
+#   docker compose up --build
+#   浏览器打开 http://localhost
+#
+# 全家桶单容器部署用根目录 Dockerfile：
+#   docker build -t liveagent . && docker run -p 8443:8443 liveagent
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      - LIVEAGENT_BACKEND_PASSWORD=${LIVEAGENT_BACKEND_PASSWORD:-pleasechangethepassword}
+    volumes:
+      - liveagent-data:/var/lib/liveagent
+    expose:
+      - "8443"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    environment:
+      - BACKEND_HOST=backend
+      - BACKEND_PORT=8443
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  liveagent-data:

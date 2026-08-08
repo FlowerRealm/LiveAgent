@@ -41,7 +41,7 @@ fn shared_app() -> &'static (axum::Router, String) {
         // 引擎凭据也从这一份 AuthConfig 里发，测试才测得到真实的那把钥匙。
         let engine_token = auth.rotate_engine_token();
         let state = build_state(auth, 0).expect("build_state 失败");
-        (build_router(state), engine_token)
+        (build_router(state, None), engine_token)
     })
 }
 

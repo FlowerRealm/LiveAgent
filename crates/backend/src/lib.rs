@@ -72,7 +72,10 @@ use crate::server::state::AppState;
 ///
 /// `/healthz` 故意放在认证之外：探活不该需要密码，否则容器编排拿不到健康状态。
 /// 它也**不泄露任何信息**——只回 `ok`。
-pub fn build_router(state: AppState) -> Router {
+///
+/// `webui_dir` 非空时把前端 dist 目录作为静态文件 serve，SPA fallback 到
+/// `index.html`——浏览器就是又一个壳，跟 Tauri 一样。
+pub fn build_router(state: AppState, webui_dir: Option<std::path::PathBuf>) -> Router {
     let protected =
         server::api_router()
             .route_layer(axum::middleware::from_fn_with_state(
@@ -83,11 +86,19 @@ pub fn build_router(state: AppState) -> Router {
             // header。ws_handler 自己用 ?token= 做等价校验。
             .merge(server::ws::router());
 
-    Router::new()
+    let mut router = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .nest("/api", protected)
         // 终端流挂在顶层 `/ws/terminal`（不在 `/api` 下），同样自己用 ?token= 校验。
-        .merge(server::ws_terminal::router())
+        .merge(server::ws_terminal::router());
+
+    if let Some(dir) = webui_dir {
+        let serve = tower_http::services::ServeDir::new(&dir)
+            .fallback(tower_http::services::ServeFile::new(dir.join("index.html")));
+        router = router.fallback_service(serve);
+    }
+
+    router
         // 浏览器前端（vite dev / WebUI）跨源访问：认证是 Bearer token 而非
         // cookie/同源，permissive CORS 不引入新的攻击面。
         .layer(tower_http::cors::CorsLayer::permissive())

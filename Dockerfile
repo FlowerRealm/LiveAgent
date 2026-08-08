@@ -21,6 +21,21 @@ COPY crates/core ./
 # 构建：tsc 类型检查 + esbuild 打包
 RUN pnpm build
 
+# 阶段1.5：构建前端 WebUI 静态文件
+FROM --platform=$BUILDPLATFORM node:22.19.0-bookworm-slim AS webui-builder
+
+WORKDIR /src/crates/frontend
+
+RUN npm install -g pnpm@10.32.1
+
+COPY crates/frontend/package.json crates/frontend/pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile
+
+COPY crates/frontend ./
+
+RUN pnpm build
+
 # 阶段2：构建 Rust 后端二进制
 FROM --platform=$BUILDPLATFORM rust:1-bookworm AS backend-builder
 
@@ -58,7 +73,7 @@ FROM node:22.19.0-bookworm-slim AS runtime
 # 缺了 Client::new() 直接 panic（backend 一启动就建 HTTP client）。
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && useradd --system --uid 10001 --user-group --home-dir /var/lib/liveagent --shell /usr/sbin/nologin liveagent \
-    && install -d -o liveagent -g liveagent -m 0700 /opt/liveagent/engine /var/lib/liveagent \
+    && install -d -o liveagent -g liveagent -m 0700 /opt/liveagent/engine /opt/liveagent/webui /var/lib/liveagent \
     && rm -rf /var/lib/apt/lists/*
 
 # 从 backend-builder 阶段复制 Rust 二进制
@@ -66,6 +81,9 @@ COPY --from=backend-builder /out/target/release/backend /usr/local/bin/backend
 
 # 从 engine-builder 阶段复制 Node 引擎 bundle
 COPY --from=engine-builder /src/crates/core/dist/index.js /opt/liveagent/engine/index.js
+
+# 从 webui-builder 阶段复制前端静态文件
+COPY --from=webui-builder /src/crates/frontend/dist /opt/liveagent/webui
 
 # 调整所有权为 liveagent 用户
 RUN chown -R liveagent:liveagent /opt/liveagent
@@ -79,6 +97,7 @@ USER liveagent
 # home 是 /nonexistent，Node 程序往那儿写就是 EACCES。
 ENV LIVEAGENT_DATA_DIR=/var/lib/liveagent \
     LIVEAGENT_ENGINE_BUNDLE=/opt/liveagent/engine \
+    LIVEAGENT_WEBUI_DIR=/opt/liveagent/webui \
     HOME=/var/lib/liveagent
 
 VOLUME ["/var/lib/liveagent"]

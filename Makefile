@@ -30,6 +30,7 @@ RELEASE_TAG ?=
 
 .PHONY: all dev core-build build desktop-build-macos desktop-build-macos-release desktop-build-macos-intel desktop-build-macos-m desktop-build-windows desktop-build-linux github-release-main check-github-release-tag help
 .PHONY: backend-docker-build backend-docker-run backend-docker-smoke
+.PHONY: docker-backend docker-frontend docker-all docker-compose-up
 .PHONY: clean update-model-catalog check-rust-target-% check-macos-signing-identity check-macos-notary-profile desktop-store-macos-notary-profile desktop-wait-macos-notary desktop-staple-macos desktop-verify-macos
 .PHONY: update-routes check-routes check-wire-events check-settings-drift
 
@@ -142,6 +143,20 @@ backend-docker-smoke: backend-docker-build
 	docker logs "$$name" || true; \
 	exit 1
 
+## Docker: 独立组件镜像
+docker-backend:
+	docker build -f docker/backend.Dockerfile -t liveagent-backend .
+
+docker-frontend:
+	docker build -f docker/frontend.Dockerfile -t liveagent-frontend .
+
+## Docker: 全家桶 + compose
+docker-all:
+	docker build -t liveagent .
+
+docker-compose-up:
+	docker compose up --build
+
 ## Maintenance
 clean:
 	cargo clean
@@ -221,9 +236,14 @@ help:
 	@printf "  %-34s %s\n" "make desktop-build-linux" "构建 Linux AppImage/deb/rpm"
 	@printf "  %-34s %s\n" "make github-release-main RELEASE_TAG=vX.Y.Z" "从 main 打 tag 并触发 GitHub Release（自动刷新模型目录并提交）"
 	@printf "\n%s\n" "Backend build"
-	@printf "  %-34s %s\n" "make backend-docker-build" "构建 backend Docker 镜像"
-	@printf "  %-34s %s\n" "make backend-docker-run" "本地运行 backend Docker 镜像"
-	@printf "  %-34s %s\n" "make backend-docker-smoke" "构建并健康检查 backend Docker 镜像"
+	@printf "  %-34s %s\n" "make backend-docker-build" "构建全家桶 Docker 镜像"
+	@printf "  %-34s %s\n" "make backend-docker-run" "本地运行全家桶 Docker 镜像"
+	@printf "  %-34s %s\n" "make backend-docker-smoke" "构建并健康检查全家桶 Docker 镜像"
+	@printf "\n%s\n" "Docker: 独立组件"
+	@printf "  %-34s %s\n" "make docker-backend" "构建后端镜像 (backend + core)"
+	@printf "  %-34s %s\n" "make docker-frontend" "构建前端镜像 (nginx + WebUI)"
+	@printf "  %-34s %s\n" "make docker-all" "构建全家桶镜像 (单容器)"
+	@printf "  %-34s %s\n" "make docker-compose-up" "compose 启动 (backend + frontend)"
 	@printf "\n%s\n" "Maintenance"
 	@printf "  %-34s %s\n" "make all" "构建 GUI"
 	@printf "  %-34s %s\n" "make clean" "清理构建产物"
