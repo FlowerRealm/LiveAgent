@@ -24,11 +24,14 @@ type LoginPageProps = {
   initialMessage?: string;
   /** 远程连接成功带 endpoint；壳内选择内嵌后端时为 null。 */
   onAuthenticated: (endpoint: BackendEndpoint | null) => void;
+  /** true = 设置页「切换后端」入口，显示完整地址/端口表单。 */
+  remoteMode?: boolean;
 };
 
-export function LoginPage({ initialMessage, onAuthenticated }: LoginPageProps) {
+export function LoginPage({ initialMessage, onAuthenticated, remoteMode }: LoginPageProps) {
   const stored = peekStoredEndpoint();
   const shell = isDesktopShell();
+  const showAddressFields = remoteMode || shell;
   const [host, setHost] = useState(stored?.host ?? (shell ? "" : "127.0.0.1"));
   const [port, setPort] = useState(String(stored?.port ?? 8443));
   const [password, setPassword] = useState("");
@@ -51,17 +54,21 @@ export function LoginPage({ initialMessage, onAuthenticated }: LoginPageProps) {
     }
 
     const parsedPort = Number(port);
-    if (!host.trim() || !Number.isFinite(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
-      setError("请填写有效的地址和端口。");
-      return;
+    if (showAddressFields) {
+      if (!host.trim() || !Number.isFinite(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
+        setError("请填写有效的地址和端口。");
+        return;
+      }
     }
 
-    const endpoint: BackendEndpoint = {
-      host: host.trim(),
-      port: parsedPort,
-      password,
-      secure,
-    };
+    const endpoint: BackendEndpoint = showAddressFields
+      ? { host: host.trim(), port: parsedPort, password, secure }
+      : {
+          host: window.location.hostname,
+          port: Number(window.location.port) || (window.location.protocol === "https:" ? 443 : 80),
+          password,
+          secure: window.location.protocol === "https:",
+        };
 
     setBusy(true);
     setError("");
@@ -81,11 +88,15 @@ export function LoginPage({ initialMessage, onAuthenticated }: LoginPageProps) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <div className="space-y-1">
-          <h1 className="text-lg font-semibold">连接到 LiveAgent 后端</h1>
+          <h1 className="text-lg font-semibold">
+            {showAddressFields ? "连接到 LiveAgent 后端" : "登录 LiveAgent"}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {shell
               ? "填写远程后端的服务器地址和访问密码；留空地址则使用本机内嵌后端。"
-              : "填写后端服务的地址和访问密码。密码保存在本机浏览器里。"}
+              : showAddressFields
+                ? "填写后端服务的地址和访问密码。密码保存在本机浏览器里。"
+                : "输入访问密码连接后端服务。"}
           </p>
         </div>
 
@@ -96,32 +107,34 @@ export function LoginPage({ initialMessage, onAuthenticated }: LoginPageProps) {
           </p>
         ) : null}
 
-        <div className="flex gap-2">
-          <div className="flex-1 space-y-1">
-            <label className="text-xs text-muted-foreground" htmlFor="login-host">
-              {shell ? "服务器地址（留空用本机）" : "地址"}
-            </label>
-            <Input
-              id="login-host"
-              value={host}
-              onChange={(event) => setHost(event.target.value)}
-              placeholder={shell ? "留空使用内嵌后端" : "127.0.0.1"}
-              autoComplete="off"
-            />
+        {showAddressFields ? (
+          <div className="flex gap-2">
+            <div className="flex-1 space-y-1">
+              <label className="text-xs text-muted-foreground" htmlFor="login-host">
+                {shell ? "服务器地址（留空用本机）" : "地址"}
+              </label>
+              <Input
+                id="login-host"
+                value={host}
+                onChange={(event) => setHost(event.target.value)}
+                placeholder={shell ? "留空使用内嵌后端" : "127.0.0.1"}
+                autoComplete="off"
+              />
+            </div>
+            <div className="w-24 space-y-1">
+              <label className="text-xs text-muted-foreground" htmlFor="login-port">
+                端口
+              </label>
+              <Input
+                id="login-port"
+                value={port}
+                onChange={(event) => setPort(event.target.value)}
+                inputMode="numeric"
+                placeholder="8443"
+              />
+            </div>
           </div>
-          <div className="w-24 space-y-1">
-            <label className="text-xs text-muted-foreground" htmlFor="login-port">
-              端口
-            </label>
-            <Input
-              id="login-port"
-              value={port}
-              onChange={(event) => setPort(event.target.value)}
-              inputMode="numeric"
-              placeholder="8443"
-            />
-          </div>
-        </div>
+        ) : null}
 
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground" htmlFor="login-password">
@@ -136,14 +149,16 @@ export function LoginPage({ initialMessage, onAuthenticated }: LoginPageProps) {
           />
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={secure}
-            onChange={(event) => setSecure(event.target.checked)}
-          />
-          使用 HTTPS / WSS
-        </label>
+        {showAddressFields ? (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={secure}
+              onChange={(event) => setSecure(event.target.checked)}
+            />
+            使用 HTTPS / WSS
+          </label>
+        ) : null}
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

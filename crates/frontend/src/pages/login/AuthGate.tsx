@@ -19,7 +19,7 @@ import { probeEndpoint } from "./probeEndpoint";
 
 type GateState =
   | { status: "checking" }
-  | { status: "login"; message?: string }
+  | { status: "login"; message?: string; remote?: boolean }
   | { status: "ready" };
 
 /** 摘掉 `?connect`，免得下次整页刷新又回到连接页。 */
@@ -32,7 +32,7 @@ function stripConnectParam(): void {
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GateState>(() => {
-    if (new URLSearchParams(window.location.search).has("connect")) return { status: "login" };
+    if (new URLSearchParams(window.location.search).has("connect")) return { status: "login", remote: true };
     if (peekStoredEndpoint()) return { status: "checking" };
     return { status: isDesktopShell() ? "ready" : "login" };
   });
@@ -75,6 +75,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <LoginPage
       initialMessage={state.message}
+      remoteMode={state.remote}
       onAuthenticated={() => {
         stripConnectParam();
         setState({ status: "ready" });

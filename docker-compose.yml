@@ -16,8 +16,8 @@ services:
       - LIVEAGENT_BACKEND_PASSWORD=${LIVEAGENT_BACKEND_PASSWORD:-pleasechangethepassword}
     volumes:
       - liveagent-data:/var/lib/liveagent
-    expose:
-      - "8443"
+    ports:
+      - "8443:8443"
 
   frontend:
     build:
