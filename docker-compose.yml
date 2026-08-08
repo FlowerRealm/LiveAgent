@@ -27,7 +27,7 @@ services:
       - BACKEND_HOST=backend
       - BACKEND_PORT=8443
     ports:
-      - "80:80"
+      - "3000:80"
     depends_on:
       - backend
 
