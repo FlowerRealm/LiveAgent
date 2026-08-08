@@ -6,6 +6,7 @@ use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::time::timeout;
 
 use crate::commands::settings::{
     check_runtime_ssh_known_host, RuntimeSshHostConfig, RuntimeSshKnownHostKey,
@@ -110,8 +111,12 @@ pub(crate) async fn connect_ssh_handle(
     };
     let config = Arc::new(ssh_client_config());
     let stream = open_ssh_transport(host_config).await?;
-    client::connect_stream(config, stream, ssh_client)
+    timeout(SSH_TCP_CONNECT_TIMEOUT, client::connect_stream(config, stream, ssh_client))
         .await
+        .map_err(|_| format!(
+            "SSH handshake with {}:{} timed out after {} seconds",
+            host_config.host, host_config.port, SSH_TCP_CONNECT_TIMEOUT.as_secs()
+        ))?
         .map_err(|error| format!("SSH connection failed: {error}"))
 }
 
@@ -128,27 +133,45 @@ pub(crate) async fn open_ssh_transport(
     host_config: &RuntimeSshHostConfig,
 ) -> Result<TcpStream, String> {
     if !ssh_proxy_configured(host_config) {
-        let stream = TcpStream::connect((host_config.host.as_str(), host_config.port))
-            .await
-            .map_err(|error| {
-                format!(
-                    "SSH TCP connection to {}:{} failed: {error}",
-                    host_config.host, host_config.port
-                )
-            })?;
+        let stream = timeout(
+            SSH_TCP_CONNECT_TIMEOUT,
+            TcpStream::connect((host_config.host.as_str(), host_config.port)),
+        )
+        .await
+        .map_err(|_| {
+            format!(
+                "SSH connection to {}:{} timed out after {} seconds",
+                host_config.host, host_config.port, SSH_TCP_CONNECT_TIMEOUT.as_secs()
+            )
+        })?
+        .map_err(|error| {
+            format!(
+                "SSH TCP connection to {}:{} failed: {error}",
+                host_config.host, host_config.port
+            )
+        })?;
         configure_ssh_transport_stream(&stream);
         return Ok(stream);
     }
 
     let proxy = resolve_ssh_proxy(host_config)?;
-    let mut stream = TcpStream::connect((proxy.host.as_str(), proxy.port))
-        .await
-        .map_err(|error| {
-            format!(
-                "SSH proxy connection to {}:{} failed: {error}",
-                proxy.host, proxy.port
-            )
-        })?;
+    let mut stream = timeout(
+        SSH_TCP_CONNECT_TIMEOUT,
+        TcpStream::connect((proxy.host.as_str(), proxy.port)),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "SSH proxy connection to {}:{} timed out after {} seconds",
+            proxy.host, proxy.port, SSH_TCP_CONNECT_TIMEOUT.as_secs()
+        )
+    })?
+    .map_err(|error| {
+        format!(
+            "SSH proxy connection to {}:{} failed: {error}",
+            proxy.host, proxy.port
+        )
+    })?;
     match proxy.kind {
         SshProxyKind::Http => {
             http_connect_proxy(
