@@ -23,13 +23,19 @@ export type ProbeResult =
 async function probeHealth(endpoint: BackendEndpoint): Promise<ProbeResult> {
   let response: Response;
   try {
-    response = await fetch(`${httpBaseUrl(endpoint)}/healthz`, { method: "GET" });
+    response = await fetch(`${httpBaseUrl(endpoint)}/healthz`, {
+      method: "GET",
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch (error) {
+    const detail =
+      error instanceof DOMException && error.name === "TimeoutError"
+        ? "连接超时（10 秒无响应）"
+        : error instanceof Error ? error.message : String(error);
     return {
       kind: "unreachable",
       message:
-        `连不上 ${endpoint.host}:${endpoint.port}：` +
-        `${error instanceof Error ? error.message : String(error)}。` +
+        `连不上 ${endpoint.host}:${endpoint.port}：${detail}。` +
         `请确认后端已启动，以及地址/端口/是否 HTTPS 填对了。`,
     };
   }
@@ -75,11 +81,16 @@ export async function probeEndpoint(endpoint: BackendEndpoint): Promise<ProbeRes
         Authorization: `Bearer ${endpoint.password}`,
       },
       body: "{}",
+      signal: AbortSignal.timeout(10_000),
     });
   } catch (error) {
+    const detail =
+      error instanceof DOMException && error.name === "TimeoutError"
+        ? "连接超时（10 秒无响应）"
+        : error instanceof Error ? error.message : String(error);
     return {
       kind: "unreachable",
-      message: `校验密码时请求失败：${error instanceof Error ? error.message : String(error)}`,
+      message: `校验密码时请求失败：${detail}`,
     };
   }
 
